@@ -97,11 +97,19 @@ class Chef
     end
 
     def lookup(key)
-      lookup_recursive(run_context, key)
+      if run_context.nil?
+        lookup_local(key)
+      else
+        lookup_recursive(run_context, key)
+      end
     end
 
     def find(*args)
-      find_recursive(run_context, *args)
+      if run_context.nil?
+        find_local(*args)
+      else
+        find_recursive(run_context, *args)
+      end
     end
 
     private
