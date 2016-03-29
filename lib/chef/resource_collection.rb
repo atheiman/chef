@@ -83,22 +83,41 @@ class Chef
     resource_list_methods = Enumerable.instance_methods +
       [:iterator, :all_resources, :[], :each, :execute_each_resource, :each_index, :empty?] -
       [:find] # find overridden below
-    resource_set_methods = [:lookup, :resources, :keys, :validate_lookup_spec!]
+    resource_set_methods = [:resources, :keys, :validate_lookup_spec!]
 
     def_delegators :resource_list, *resource_list_methods
     def_delegators :resource_set, *resource_set_methods
 
+    def lookup_local(key)
+      resource_set.lookup(key)
+    end
+
+    def find_local(*args)
+      resource_set.find(*args)
+    end
+
+    def lookup(key)
+      lookup_recursive(run_context, key)
+    end
+
     def find(*args)
-      recursive_find(run_context, *args)
+      find_recursive(run_context, *args)
     end
 
     private
 
-    def recursive_find(rc, *args)
+    def find_recursive(rc, key)
+      rc.resource_collection.resource_set.lookup(key)
+    rescue Chef::Exceptions::ResourceNotFound
+      raise if rc.parent_run_context.nil?
+      lookup_recursive(rc.parent_run_context, key)
+    end
+
+    def find_recursive(rc, *args)
       rc.resource_collection.resource_set.find(*args)
     rescue Chef::Exceptions::ResourceNotFound
       raise if rc.parent_run_context.nil?
-      recursive_find(rc.parent_run_context, *args)
+      find_recursive(rc.parent_run_context, *args)
     end
   end
 end
