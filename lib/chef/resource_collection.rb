@@ -35,7 +35,7 @@ class Chef
     attr_reader :resource_set, :resource_list
     attr_accessor :run_context
 
-    private :resource_set, :resource_list
+    protected :resource_set, :resource_list
 
     def initialize(run_context = nil)
       @run_context = run_context
@@ -88,11 +88,17 @@ class Chef
     def_delegators :resource_list, *resource_list_methods
     def_delegators :resource_set, *resource_set_methods
 
-    def find(rc: run_context, *args)
+    def find(*args)
+      recursive_find(run_context, *args)
+    end
+
+    private
+
+    def recursive_find(rc, *args)
       rc.resource_collection.resource_set.find(*args)
     rescue Chef::Exceptions::ResourceNotFound
       raise if rc.parent_run_context.nil?
-      find(rc: rc.parent_run_context, *args)
+      recursive_find(rc.parent_run_context, *args)
     end
   end
 end
