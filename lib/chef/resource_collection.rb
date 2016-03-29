@@ -106,7 +106,7 @@ class Chef
 
     private
 
-    def find_recursive(rc, key)
+    def lookup_recursive(rc, key)
       rc.resource_collection.resource_set.lookup(key)
     rescue Chef::Exceptions::ResourceNotFound
       raise if rc.parent_run_context.nil?
