@@ -30,13 +30,14 @@ class Chef
 
     attr_reader :run_context
 
-    attr_reader :delayed_actions
-
     include Chef::Mixin::ParamsValidate
 
     def initialize(run_context)
-      @run_context      = run_context
-      @delayed_actions  = []
+      @run_context = run_context
+    end
+
+    def delayed_actions
+      @run_context.delayed_actions
     end
 
     def events
@@ -120,6 +121,17 @@ class Chef
       collected_failures = Exceptions::MultipleFailures.new
       collected_failures.client_run_failure(error) unless error.nil?
       delayed_actions.each do |notification|
+        if notification.resource.run_context != run_context
+          Chef::Log.debug("delayed notification action #{notification.action} to #{notification.resource} promoted to the target's run_context")
+          if notification.resource.run_context.delayed_actions.any? { |existing_notification| existing_notification.duplicates?(notification) }
+            # skipit
+          else
+            notification.resource.run_context.notifies_delayed(notification)
+            notification.resource.run_context.delayed_actions << notification
+          end
+          next
+        end
+
         result = run_delayed_notification(notification)
         if result.kind_of?(Exception)
           collected_failures.notification_failure(result)

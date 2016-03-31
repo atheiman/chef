@@ -130,6 +130,14 @@ class Chef
     #
     attr_reader :delayed_notification_collection
 
+    #
+    # An Array containing the delayed (end of run) notifications triggered by
+    # resources during the converge phase of the chef run.
+    #
+    # @return [Array[Chef::Resource::Notification]] An array of notification objects
+    #
+    attr_reader :delayed_actions
+
     # Creates a new Chef::RunContext object and populates its fields. This object gets
     # used by the Chef Server to generate a fully compiled recipe list for a node.
     #
@@ -152,6 +160,7 @@ class Chef
       @loaded_attributes_hash = {}
       @reboot_info = {}
       @cookbook_compiler = nil
+      @delayed_actions = []
 
       initialize_child_state
     end
@@ -176,6 +185,7 @@ class Chef
       @before_notification_collection = Hash.new { |h, k| h[k] = [] }
       @immediate_notification_collection = Hash.new { |h, k| h[k] = [] }
       @delayed_notification_collection = Hash.new { |h, k| h[k] = [] }
+      @delayed_actions = []
     end
 
     #
@@ -640,6 +650,7 @@ ERROR_MESSAGE
         audits
         audits=
         create_child
+        delayed_actions
         delayed_notification_collection
         delayed_notification_collection=
         delayed_notifications
