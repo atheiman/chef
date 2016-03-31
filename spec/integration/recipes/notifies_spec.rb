@@ -8,7 +8,7 @@ describe "notifications" do
   let(:chef_dir) { File.expand_path("../../../../bin", __FILE__) }
   let(:chef_client) { "ruby '#{chef_dir}/chef-client' --minimal-ohai" }
 
-  when_the_repository "notifies delayed" do
+  when_the_repository "notifies delayed one" do
     before do
       directory "cookbooks/x" do
 
@@ -43,7 +43,134 @@ log_level :warn
 EOM
 
       result = shell_out("#{chef_client} -c \"#{path_to('config/client.rb')}\" --no-color -F doc -o 'x::default'", :cwd => chef_dir)
-      expect(result.stdout).to match(/\* log\[bar\] action write\s+\* log\[foo\] action write\s+\* log\[baz\] action write/)
+      # our delayed notification should run at the end of the parent run_context after the baz resource
+      expect(result.stdout).to match(/\* log\[bar\] action write\s+\* log\[baz\] action write\s+\* log\[foo\] action write/)
+      result.error!
+    end
+  end
+
+  when_the_repository "notifies delayed two" do
+    before do
+      directory "cookbooks/x" do
+
+        file "resources/notifying_test.rb", <<EOM
+default_action :run
+provides :notifying_test
+resource_name :notifying_test
+
+action :run do
+  log "bar" do
+    notifies :write, 'log[foo]', :delayed
+  end
+end
+EOM
+
+        file "recipes/default.rb", <<EOM
+log "foo" do
+  action :nothing
+end
+notifying_test "whatever"
+log "baz" do
+  notifies :write, 'log[foo]', :delayed
+end
+EOM
+
+      end
+    end
+
+    it "should complete with success" do
+      file "config/client.rb", <<EOM
+local_mode true
+cookbook_path "#{path_to('cookbooks')}"
+log_level :warn
+EOM
+
+      result = shell_out("#{chef_client} -c \"#{path_to('config/client.rb')}\" --no-color -F doc -o 'x::default'", :cwd => chef_dir)
+      # our delayed notification should run at the end of the parent run_context after the baz resource
+      expect(result.stdout).to match(/\* log\[bar\] action write\s+\* log\[baz\] action write\s+\* log\[foo\] action write/)
+      # and only run once
+      expect(result.stdout).not_to match(/\* log\[foo\] action write.*\* log\[foo\] action write/)
+      result.error!
+    end
+  end
+
+  when_the_repository "notifies delayed three" do
+    before do
+      directory "cookbooks/x" do
+
+        file "resources/notifying_test.rb", <<EOM
+default_action :run
+provides :notifying_test
+resource_name :notifying_test
+
+action :run do
+  log "bar" do
+    notifies :write, 'log[foo]', :delayed
+  end
+end
+EOM
+
+        file "recipes/default.rb", <<EOM
+log "foo" do
+  action :nothing
+end
+log "quux" do
+  notifies :write, 'log[foo]', :delayed
+  notifies :write, 'log[baz]', :delayed
+end
+notifying_test "whatever"
+log "baz"
+EOM
+
+      end
+    end
+
+    it "should complete with success" do
+      file "config/client.rb", <<EOM
+local_mode true
+cookbook_path "#{path_to('cookbooks')}"
+log_level :warn
+EOM
+
+      result = shell_out("#{chef_client} -c \"#{path_to('config/client.rb')}\" --no-color -F doc -o 'x::default'", :cwd => chef_dir)
+      # the delayed notification from the sub-resource is de-duplicated by the notification already in the parent run_context
+      expect(result.stdout).to match(/\* log\[quux\] action write\s+\* notifying_test[whatever] action run\s+\* log\[bar\] action write\s+\* log\[baz\] action write\s+\* log\[foo\] action write\s+\* log\[baz\] action write/)
+      # and only run once
+      expect(result.stdout).not_to match(/\* log\[foo\] action write.*\* log\[foo\] action write/)
+      result.error!
+    end
+  end
+
+  when_the_repository "notifies delayed four" do
+    before do
+      directory "cookbooks/x" do
+        file "recipes/default.rb", <<EOM
+log "foo" do
+  action :nothing
+end
+log "bar" do
+  notifies :write, 'log[foo]', :delayed
+end
+log "baz" do
+  notifies :write, 'log[foo]', :delayed
+end
+EOM
+
+      end
+    end
+
+    it "should complete with success" do
+      file "config/client.rb", <<EOM
+local_mode true
+cookbook_path "#{path_to('cookbooks')}"
+log_level :warn
+EOM
+
+      result = shell_out("#{chef_client} -c \"#{path_to('config/client.rb')}\" --no-color -F doc -o 'x::default'", :cwd => chef_dir)
+      # the delayed notification from the sub-resource is de-duplicated by the notification already in the parent run_context
+      expect(result.stdout).to match(/\* log\[bar\] action write\s+\* log\[baz\] action write\s+\* log\[foo\] action write/)
+      # and only run once
+      expect(result.stdout).not_to match(/\* log\[foo\] action write.*\* log\[foo\] action write/)
       result.error!
     end
   end
@@ -99,7 +226,7 @@ resource_name :notifying_test
 
 action :run do
   log "bar" do
-    notifies :write, resources(log: "foo")
+    notifies :write, resources(log: "foo"), :immediately
   end
 end
 EOM
