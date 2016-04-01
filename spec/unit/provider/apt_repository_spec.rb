@@ -176,24 +176,4 @@ describe Chef::Provider::AptRepository do
     end
   end
 
-  context "when the apt config directory does not exist" do
-    before do
-      FileUtils.rmdir config_dir
-      expect(File.exist?(config_dir)).to be false
-      allow_any_instance_of(Chef::Provider::Execute).to receive(:shell_out!).with("apt-get -q update", anything())
-    end
-
-    it "should create the directory" do
-      provider.run_action(:update)
-      expect(File.exist?(config_dir)).to be true
-      expect(File.directory?(config_dir)).to be true
-    end
-
-    it "should create the config file" do
-      provider.run_action(:update)
-      expect(File.exist?(config_file)).to be true
-      expect(File.read(config_file)).to match(/^APT::Update.*#{stamp_dir}/)
-    end
-  end
-
 end

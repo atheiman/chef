@@ -89,7 +89,14 @@ class Chef
             declare_resource(:file, "/etc/apt/sources.list.d/#{new_resource.name}.list") do
               sensitive new_resource.sensitive
               action :delete
+              notifies :update, "apt_update[#{new_resource.name}]", :immediately if new_resource.cache_rebuild
             end
+
+            declare_resource(:apt_update, new_resource.name) do
+              ignore_failure true
+              action :nothing
+            end
+
           end
         end
       end
